@@ -1,0 +1,29 @@
+{
+  "name": "http-to-datadog",
+  "version": "0.0.5",
+  "description": "An extremely simple HTTP to datadog forwarder.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/WangXinSeek/http-to-datadog.git"
+  },
+  "keywords": [
+    "HTTP",
+    "UDP"
+  ],
+  "author": "xwang@seek.com.au",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/WangXinSeek/http-to-datadog/issues"
+  },
+  "homepage": "https://github.com/WangXinSeek/http-to-datadog#readme",
+  "dependencies": {
+    "body-parser": "^1.15.1",
+    "connect-datadog": "0.0.6",
+    "express": "^4.13.4",
+    "node-dogstatsd": "0.0.6"
+  }
+}
