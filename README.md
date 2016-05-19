@@ -1,4 +1,5 @@
 # http-to-datadog forwarder
+[<img src="https://travis-ci.org/WangXinSeek/http-to-datadog.svg?branch=master">](https://travis-ci.org/WangXinSeek/http-to-datadog.svg?branch=master)
 
 An extremely simple HTTP to datadog forwarder.
 

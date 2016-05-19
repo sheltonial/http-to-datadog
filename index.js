@@ -6,7 +6,7 @@ const bunyan = require('bunyan');
 const restifyBunyanLogger = require('restify-bunyan-logger');
 
 exports.startServer = (options, onstart) => {
-  const APP_NAME = 'http-to-datadog';
+  const APP_NAME = 'http_to_datadog';
   const server = restify.createServer({
     name: APP_NAME
   });
@@ -37,14 +37,13 @@ exports.startServer = (options, onstart) => {
     allowOrigin: options.allowOrigin || process.env.ALLOW_ORIGIN || '*',
     tags: tags(options),
     logPath: options.logPath || process.env.LOG_PATH || '/var/log',
-    forwarder: options.forwarder || udpForward, // for testing purpose, could be injected through testing code
+    forwarder: options.forwarder, // for testing purpose, could be injected through testing code
     logger: options.logger // same as forwarder
   }
 
   const log = config.logger || bunyan.createLogger({
     name: APP_NAME,
     streams: [{
-
       type: 'rotating-file',
       path: `${config.logPath}/${APP_NAME}.log`,
       period: '1d', // daily rotation
@@ -66,15 +65,6 @@ exports.startServer = (options, onstart) => {
     stat: APP_NAME
   });
 
-  function udpForward(text, config) {
-    const sender = dgram.createSocket('udp4');
-
-    sender.send(text, config.sinkPort, config.sinkHost, (err) => {
-      log.error(err); // record not interrupt
-      sender.close();
-    });
-  }
-
   function cors(req, res, next) {
     res.setHeader('Access-Control-Allow-Origin', config.allowOrigin);
     res.setHeader('Access-Control-Allow-Methods', 'POST, GET');
@@ -83,8 +73,8 @@ exports.startServer = (options, onstart) => {
     return next();
   }
 
-  server.use(metrics);
   server.use(restify.bodyParser());
+  server.use(metrics);
   server.use(cors);
 
   function index(req, res, next) {
@@ -93,9 +83,14 @@ exports.startServer = (options, onstart) => {
   }
 
   function metricsReceived(req, res, next) {
-    config.forwarder(req.body, config);
+    const sender = dgram.createSocket('udp4');
+
+    sender.send(req.body, config.sinkPort, config.sinkHost, err => {
+      log.error(err); // record not interrupt
+      sender.close();
+    });
     res.send(204);
-    return next;
+    return next();
   }
 
   server.get('/', index);
