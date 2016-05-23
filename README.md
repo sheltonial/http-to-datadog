@@ -14,7 +14,7 @@ npm install http-to-datadog
 ## Configuration and running
 
 ```
-require('http-to-datadog').startServer({});
+require('http-to-datadog').startServer({}, ()=>{});
 ```
 
 ### Options
@@ -32,6 +32,6 @@ const options = {
     allowOrigin: '*', # ALLOW_ORIGIN
     tags: ['environment:development'] # TAGS=environment:development,othertag:value
 }
-require('http-to-datadog').startServer(options);
+require('http-to-datadog').startServer(options, ()=>{});
 
 ```

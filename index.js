@@ -1,7 +1,6 @@
 const dgram = require('dgram');
 const restify = require('restify');
-const connectDatadog = require('connect-datadog');
-const nodeDogstatsd = require('node-dogstatsd');
+const nodeDogstatsd = require('dogstatsd-node');
 const bunyan = require('bunyan');
 const restifyBunyanLogger = require('restify-bunyan-logger');
 
@@ -41,6 +40,44 @@ exports.startServer = (options, onstart) => {
     logger: options.logger // same as forwarder
   }
 
+  const statsd = new nodeDogstatsd.StatsD({
+    host: config.sinkHost,
+    port: config.sinkPort,
+    prefix: `${APP_NAME}.`
+  });
+
+  function now() {
+    return new Date().getTime();
+  }
+
+  function increment(name, tags) {
+    statsd.increment(name).tags(tags).send();
+  }
+
+  function timeToNow(time) {
+    return now() - time;
+  }
+
+  function timingFrom(timer, startTime, tags) {
+    timing(timer, timeToNow(startTime), tags);
+  }
+
+  function timing(name, value, tags) {
+    statsd.timing(name, value).tags(tags).send();
+  }
+
+  function cors(req, res, next) {
+    res.setHeader('Access-Control-Allow-Origin', config.allowOrigin);
+    res.setHeader('Access-Control-Allow-Methods', 'POST, GET');
+    res.setHeader('Access-Control-Max-Age', '604800');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    return next();
+  }
+
+  server.use(restify.queryParser());
+  server.use(restify.bodyParser());
+  server.use(cors);
+
   const log = config.logger || bunyan.createLogger({
     name: APP_NAME,
     streams: [{
@@ -58,37 +95,24 @@ exports.startServer = (options, onstart) => {
     logger: log
   }));
 
-  const statsd = nodeDogstatsd.StatsD(config.sinkHost, config.sinkPort);
-  const metrics = connectDatadog({
-    dogstatsd: statsd,
-    tags: config.tags,
-    stat: APP_NAME
-  });
-
-  function cors(req, res, next) {
-    res.setHeader('Access-Control-Allow-Origin', config.allowOrigin);
-    res.setHeader('Access-Control-Allow-Methods', 'POST, GET');
-    res.setHeader('Access-Control-Max-Age', '604800');
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    return next();
-  }
-
-  server.use(restify.bodyParser());
-  server.use(metrics);
-  server.use(cors);
-
   function index(req, res, next) {
     res.send(APP_NAME);
     return next();
   }
 
   function metricsReceived(req, res, next) {
+    const tags = config.tags.slice(0);
     const sender = dgram.createSocket('udp4');
+    const startTime = req.time();
 
     sender.send(req.body, config.sinkPort, config.sinkHost, err => {
       log.error(err); // record not interrupt
       sender.close();
     });
+    tags.push('status-code:204');
+    tags.push(`request-path:${config.appPath}`);
+    timingFrom('response_time', startTime, tags);
+    increment('count', tags);
     res.send(204);
     return next();
   }
@@ -96,7 +120,14 @@ exports.startServer = (options, onstart) => {
   server.get('/', index);
   server.post(config.appPath, metricsReceived);
   server.get(healthCheckPath(config.appPath), (req, res, next) => {
+    const tags = config.tags.slice(0);
+    const startTime = req.time();
+
     res.send('OK');
+    tags.push('status-code:200');
+    tags.push(`request-path:${healthCheckPath(config.appPath)}`)
+    timingFrom('response_time', startTime, tags);
+    increment('count', tags);
     return next();
   });
 

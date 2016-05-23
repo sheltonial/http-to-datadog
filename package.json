@@ -1,6 +1,6 @@
 {
   "name": "http-to-datadog",
-  "version": "0.0.15",
+  "version": "0.0.20",
   "description": "An extremely simple HTTP to datadog forwarder.",
   "main": "index.js",
   "scripts": {
@@ -22,8 +22,7 @@
   "homepage": "https://github.com/WangXinSeek/http-to-datadog#readme",
   "dependencies": {
     "bunyan": "^1.8.1",
-    "connect-datadog": "0.0.6",
-    "node-dogstatsd": "0.0.6",
+    "dogstatsd-node": "0.0.1",
     "restify": "^4.0.4",
     "restify-bunyan-logger": "^2.0.7"
   },
