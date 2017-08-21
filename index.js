@@ -9,6 +9,8 @@ exports.startServer = (options, onstart) => {
   const server = restify.createServer({
     name: APP_NAME
   });
+  
+  const sender = dgram.createSocket('udp4');
 
   function tags(options) {
     const tags = options.tags || process.env.TAGS;
@@ -102,10 +104,9 @@ exports.startServer = (options, onstart) => {
 
   function metricsReceived(req, res, next) {
     const tags = config.tags.slice(0);
-    const sender = dgram.createSocket('udp4');
     const startTime = req.time();
-
-    sender.send(req.body, config.sinkPort, config.sinkHost, err => {
+    const buf = new Buffer(req.body);
+    sender.send(buf, 0, buf.length, config.sinkPort, config.sinkHost, err => {
       log.error(err); // record not interrupt
       sender.close();
     });
