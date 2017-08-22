@@ -107,7 +107,8 @@ exports.startServer = (options, onstart) => {
     const startTime = req.time();
     const buf = new Buffer(req.body);
     sender.send(buf, 0, buf.length, config.sinkPort, config.sinkHost, err => {
-      log.error(err); // record not interrupt
+      increment('forwarding_error', tags);
+      log.error({err: err}); // record not interrupt
     });
     tags.push('status-code:204');
     tags.push(`request-path:${config.appPath}`);
