@@ -106,7 +106,13 @@ exports.startServer = (options, onstart) => {
     const startTime = req.time();
 
     sender.send(req.body, config.sinkPort, config.sinkHost, err => {
-      log.error(err); // record not interrupt
+      if (err) {
+        increment('forwarding_error', tags);
+        log.error({err: err}); // record not interrupt
+      } else {
+        increment('forwarding_success', tags);
+        log.info({ req: req, requestBody: req.body });
+      }
       sender.close();
     });
     tags.push('status-code:204');
