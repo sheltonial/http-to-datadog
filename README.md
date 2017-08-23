@@ -30,7 +30,8 @@ const options = {
     sinkPort: 8125, # DDAGENT_PORT
     appPath: '/v1/send', # APP_PATH
     allowOrigin: '*', # ALLOW_ORIGIN
-    tags: ['environment:development'] # TAGS=environment:development,othertag:value
+    tags: ['environment:development'], # TAGS=environment:development,othertag:value
+    statsBatchSize: 3 # number of stats to transmit at once over UDP to statsd collector. Default is 0 which transmits all stats in one batch.
 }
 require('http-to-datadog').startServer(options, ()=>{});
 
