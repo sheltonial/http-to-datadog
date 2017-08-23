@@ -39,7 +39,8 @@ exports.startServer = (options, onstart) => {
     tags: tags(options),
     logPath: options.logPath || process.env.LOG_PATH || '/var/log',
     forwarder: options.forwarder, // for testing purpose, could be injected through testing code
-    logger: options.logger // same as forwarder
+    logger: options.logger, // same as forwarder
+    bulkForward: options.bulkForward || true
   }
 
   const statsd = new nodeDogstatsd.StatsD({
@@ -105,9 +106,12 @@ exports.startServer = (options, onstart) => {
   function metricsReceived(req, res, next) {
     const tags = config.tags.slice(0);
     const startTime = req.time();
+    const payloads = config.bulkForward ?
+          [ res.body ] :
+          res.body.split('\n');
     
-    req.body.split('\n').forEach(metric => {
-      sender.send(metric, config.sinkPort, config.sinkHost, err => {
+    payloads.forEach(payload => {
+      sender.send(payload, config.sinkPort, config.sinkHost, err => {
         if (err) {
           increment('forwarding_error', tags);
           log.error({err: err}); // record not interrupt
