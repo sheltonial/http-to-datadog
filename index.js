@@ -9,6 +9,8 @@ exports.startServer = (options, onstart) => {
   const server = restify.createServer({
     name: APP_NAME
   });
+  
+  const sender = dgram.createSocket('udp4');
 
   function tags(options) {
     const tags = options.tags || process.env.TAGS;
@@ -102,19 +104,17 @@ exports.startServer = (options, onstart) => {
 
   function metricsReceived(req, res, next) {
     const tags = config.tags.slice(0);
-    const sender = dgram.createSocket('udp4');
     const startTime = req.time();
+    
+    req.body.split('\n').forEach(metric => {
+      sender.send(metric, config.sinkPort, config.sinkHost, err => {
+        if (err) {
+          increment('forwarding_error', tags);
+          log.error({err: err}); // record not interrupt
+        }
+      });
+    })
 
-    sender.send(req.body, config.sinkPort, config.sinkHost, err => {
-      if (err) {
-        increment('forwarding_error', tags);
-        log.error({err: err}); // record not interrupt
-      } else {
-        increment('forwarding_success', tags);
-        log.info({ req: req, requestBody: req.body });
-      }
-      sender.close();
-    });
     tags.push('status-code:204');
     tags.push(`request-path:${config.appPath}`);
     timingFrom('response_time', startTime, tags);
