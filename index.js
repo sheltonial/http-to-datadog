@@ -40,7 +40,7 @@ exports.startServer = (options, onstart) => {
     logPath: options.logPath || process.env.LOG_PATH || '/var/log',
     forwarder: options.forwarder, // for testing purpose, could be injected through testing code
     logger: options.logger, // same as forwarder
-    bulkForward: options.bulkForward || true
+    statsBatchSize: options.statsBatchSize || 0
   }
 
   const statsd = new nodeDogstatsd.StatsD({
@@ -102,16 +102,30 @@ exports.startServer = (options, onstart) => {
     res.send(APP_NAME);
     return next();
   }
+  
+  function getStatsBatches(stats) {
+    const statsSeperator = '\n';
+    const statsArr = stats.split(statsSeperator);
+    const statsBatches = [];
+    
+    if (config.statsBatchSize === 0) {
+      return stats; 
+    }
+    
+    while (statsArr.length > 0) {
+      statsBatches.push(statsArr.splice(0, config.statsBatchSize).join(statsSeperator));
+    }
+    
+    return statsBatches;
+  }
 
   function metricsReceived(req, res, next) {
     const tags = config.tags.slice(0);
     const startTime = req.time();
-    const payloads = config.bulkForward ?
-          [ res.body ] :
-          res.body.split('\n');
+    const statsBatches = getStatsBatches(res.body);
     
-    payloads.forEach(payload => {
-      sender.send(payload, config.sinkPort, config.sinkHost, err => {
+    statsBatches.forEach(statsBatch => {
+      sender.send(statsBatch, config.sinkPort, config.sinkHost, err => {
         if (err) {
           increment('forwarding_error', tags);
           log.error({err: err}); // record not interrupt
