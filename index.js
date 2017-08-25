@@ -9,6 +9,7 @@ exports.startServer = (options, onstart) => {
   const server = restify.createServer({
     name: APP_NAME
   });
+  const statsForwarder = dgram.createSocket('udp4');
 
   function tags(options) {
     const tags = options.tags || process.env.TAGS;
@@ -100,15 +101,36 @@ exports.startServer = (options, onstart) => {
     return next();
   }
 
+  function getBatches(stats, maxBatchSize) {
+    const batches = [];
+
+    stats.split('\n').reduce((currentBatch, currentStat) => {
+      const newBatch = (currentBatch + '\n' + currentStat);
+      if (newBatch.length < maxBatchSize) {
+        return newBatch;
+      } else {
+        batches.push(newBatch);
+        return '';
+      }
+    }, '');
+    return batches;
+  }
+
   function metricsReceived(req, res, next) {
     const tags = config.tags.slice(0);
-    const sender = dgram.createSocket('udp4');
     const startTime = req.time();
+    const maxBatchSize = 8196;
+    const statsBatches = getBatches(req.body, maxBatchSize);
 
-    sender.send(req.body, config.sinkPort, config.sinkHost, err => {
-      log.error(err); // record not interrupt
-      sender.close();
+    statsBatches.forEach(statsBatch => {
+      statsForwarder.send(statsBatch, config.sinkPort, config.sinkHost, err => {
+        if (err) {
+          increment('forwarding_error', tags);
+          log.error({err: err}); // record not interrupt
+        }
+      });
     });
+
     tags.push('status-code:204');
     tags.push(`request-path:${config.appPath}`);
     timingFrom('response_time', startTime, tags);
