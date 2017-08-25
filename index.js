@@ -102,18 +102,20 @@ exports.startServer = (options, onstart) => {
   }
 
   function getBatches(stats, maxBatchSize) {
-    const batches = [];
+    return stats.split('\n')
+      .filter(stat => stat.trim().length > 0)
+      .reduce((batches, currentStat, currentIndex, statsArray) => {
+        const currentBatchIndex = batches.length - 1;
+        const currentBatch = batches[currentBatchIndex];
+        const newBatch = currentBatch + (currentBatch.length > 0 ? '\n' : '') + currentStat;
 
-    stats.split('\n').reduce((currentBatch, currentStat) => {
-      const newBatch = (currentBatch + '\n' + currentStat);
-      if (newBatch.length < maxBatchSize) {
-        return newBatch;
-      } else {
-        batches.push(newBatch);
-        return '';
-      }
-    }, '');
-    return batches;
+        if (newBatch.length < maxBatchSize) {
+          batches[currentBatchIndex] = newBatch;
+        } else {
+          batches.push(currentStat);
+        }
+        return batches;
+      }, ['']);
   }
 
   function metricsReceived(req, res, next) {
@@ -123,7 +125,8 @@ exports.startServer = (options, onstart) => {
     const statsBatches = getBatches(req.body, maxBatchSize);
 
     statsBatches.forEach(statsBatch => {
-      statsForwarder.send(statsBatch, config.sinkPort, config.sinkHost, err => {
+      const statsBuffer = new Buffer(statsBatch);
+      statsForwarder.send(statsBuffer, 0, statsBuffer.length, config.sinkPort, config.sinkHost, err => {
         if (err) {
           increment('forwarding_error', tags);
           log.error({err: err}); // record not interrupt
