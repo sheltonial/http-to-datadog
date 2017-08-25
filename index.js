@@ -128,8 +128,10 @@ exports.startServer = (options, onstart) => {
       const statsBuffer = new Buffer(statsBatch);
       statsForwarder.send(statsBuffer, 0, statsBuffer.length, config.sinkPort, config.sinkHost, err => {
         if (err) {
-          increment('forwarding_error', tags);
-          log.error({err: err}); // record not interrupt
+          increment('forward_error', tags);
+          log.error({err: err, msg: `error forwarding metric to ${config.sinkHost}:${config.sinkPort}`});
+        } else {
+          increment('forward_ok', tags);
         }
       });
     });
