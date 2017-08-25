@@ -1,6 +1,6 @@
 {
   "name": "http-to-datadog",
-  "version": "0.0.20",
+  "version": "0.0.21",
   "description": "An extremely simple HTTP to datadog forwarder.",
   "main": "index.js",
   "scripts": {
