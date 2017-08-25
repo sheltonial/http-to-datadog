@@ -127,6 +127,7 @@ ${statsToForwardPrefix}.api:192|ms|#request-path:seek-au-apitoken-grant,http-met
 
     it('should handle stat payloads with extra blank lines', (done) => {
       const payload = stats.split('\n').join('\n\n\n');
+
       client.post('/v1/send', payload,  () => {
         setTimeout(() => { // wait for metrics to be received by stats server
           const forwardedStatsReceived = getStatsReceived(statsToForwardPrefix);
@@ -135,23 +136,53 @@ ${statsToForwardPrefix}.api:192|ms|#request-path:seek-au-apitoken-grant,http-met
           done();
         }, statsServerReceiveDelay);
       });
-    })
+    });
 
-    it('should break large stat payloads over batches', (done) => {
+    describe('break large stat payloads over batches', () => {
       const maxBatchSize = 8196;
-      const largeStat = statsToForwardPrefix + new Array(maxBatchSize - statsToForwardPrefix.length).fill('a').join('');
-      const payload = stats + '\n' + largeStat;
 
-      client.post('/v1/send', payload,  () => {
-        setTimeout(() => { // wait for metrics to be received by stats server
-          const forwardedStatsReceived = getStatsReceived(statsToForwardPrefix);
+      function batchTest(statsToSend, expectedBatches, statsPrefix, callback) {
+        client.post('/v1/send', statsToSend,  () => {
+          setTimeout(() => { // wait for metrics to be received by stats server
+            const forwardedStatsReceived = getStatsReceived(statsPrefix);
 
-          assert.equal(2, forwardedStatsReceived.length, 'should have received 2 batches of forwarded metrics');
-          assert.deepEqual(forwardedStatsReceived[0], stats, 'first batch');
-          assert.deepEqual(forwardedStatsReceived[1], largeStat, 'second batch');
-          done();
-        }, statsServerReceiveDelay);
+            assert.equal(expectedBatches.length, forwardedStatsReceived.length, `should have received ${expectedBatches} batches of forwarded metrics`);
+            forwardedStatsReceived.forEach((forwardedStat, index) => {
+              assert.deepEqual(forwardedStat, expectedBatches[index], `problem with batch ${index + 1}`);
+            });
+
+            callback();
+          }, statsServerReceiveDelay);
+        });
+      }
+
+      it('large stat at front', done => {
+        const largeStat = statsToForwardPrefix + new Array(maxBatchSize - statsToForwardPrefix.length).fill('a').join('');
+        const payload = largeStat + '\n' + stats;
+        const expectedBatches = [largeStat, stats];
+        batchTest(payload, expectedBatches, statsToForwardPrefix, done);
       });
-    })
+
+      it('large stat at back', done => {
+        const largeStat = statsToForwardPrefix + new Array(maxBatchSize - statsToForwardPrefix.length).fill('a').join('');
+        const payload = stats + '\n' + largeStat;
+        const expectedBatches = [stats, largeStat];
+        batchTest(payload, expectedBatches, statsToForwardPrefix, done);
+      });
+
+      it('large stat in middle', done => {
+        const largeStat = statsToForwardPrefix + new Array(maxBatchSize - statsToForwardPrefix.length).fill('a').join('');
+        const payload = stats + '\n' + largeStat + '\n' + stats;
+        const expectedBatches = [stats, largeStat, stats];
+        batchTest(payload, expectedBatches, statsToForwardPrefix, done);
+      });
+
+      it('large stat at front and back', done => {
+        const largeStat = statsToForwardPrefix + new Array(maxBatchSize - statsToForwardPrefix.length).fill('a').join('');
+        const payload = largeStat + '\n' + stats + '\n' + largeStat;
+        const expectedBatches = [largeStat, stats, largeStat];
+        batchTest(payload, expectedBatches, statsToForwardPrefix, done);
+      });
+    });
   });
 });
