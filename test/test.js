@@ -139,7 +139,7 @@ ${statsToForwardPrefix}.api:192|ms|#request-path:seek-au-apitoken-grant,http-met
     });
 
     describe('break large stat payloads over batches', () => {
-      const maxBatchSize = 8196;
+      const maxBatchSize = 1024 * 8;
 
       function batchTest(statsToSend, expectedBatches, statsPrefix, callback) {
         client.post('/v1/send', statsToSend,  () => {

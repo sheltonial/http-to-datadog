@@ -121,7 +121,7 @@ exports.startServer = (options, onstart) => {
   function metricsReceived(req, res, next) {
     const tags = config.tags.slice(0);
     const startTime = req.time();
-    const maxBatchSize = 8196;
+    const maxBatchSize = 1024 * 8;
     const statsBatches = getBatches(req.body, maxBatchSize);
 
     statsBatches.forEach(statsBatch => {
